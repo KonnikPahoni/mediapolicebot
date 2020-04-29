@@ -1,0 +1,6 @@
+Telegram:
+<Telegram bot token>
+Facebook:
+<long term Facebook api token>
+Dialogflow:
+<dialogflow token>
