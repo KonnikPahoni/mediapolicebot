@@ -30,6 +30,7 @@ TELEGRAM_TOKEN = str(os.environ['TELEGRAM_TOKEN'])
 FACEBOOK_TOKEN = str(os.environ['FACEBOOK_TOKEN'])
 DIALOGFLOW_TOKEN = str(os.environ['DIALOGFLOW_TOKEN'])
 
+
 with open('bot_messages/help.txt', encoding='utf-8') as help_file:
     help_text = help_file.read()
 with open('bot_messages/oath.txt', encoding='utf-8') as oath_file:
@@ -223,10 +224,10 @@ def admin_selectivity(handler):
     def decorated(update, context):
         condition = False
         try:
-            condition = (int(update.message.from_user.id) in ADMIN_ID) and (
+            condition = (str(update.message.from_user.id) in ADMIN_ID) and (
                     int(update.message.chat.id) == TELEGRAM_CHAT_ID)
-        except:
-            condition = (int(update.callback_query.from_user.id) in ADMIN_ID) and (
+        except Exception:
+            condition = (str(update.callback_query.from_user.id) in ADMIN_ID) and (
                     int(update.callback_query.message.chat.id) == TELEGRAM_CHAT_ID)
         finally:
             if condition:
@@ -806,3 +807,5 @@ while True:
     except NetworkError as e:
         print('Network error. Reconnecting in ' + str(RECONNECT_INTERVAL) + ' seconds')
         time.sleep(RECONNECT_INTERVAL)
+    except KeyboardInterrupt:
+        print('Media Police Bot stopping')
