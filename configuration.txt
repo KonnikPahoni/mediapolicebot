@@ -1,8 +1,0 @@
-FACEBOOK_PAGE_ID
-<Facebook page ID>
-TELEGRAM_CHAT_ID
-<Media service telegram group id>
-ADMIN_ID (comma-separated)
-<Telegram admin id>
-FB_LIKE_ID
-<Telegram group for liking new posts id>

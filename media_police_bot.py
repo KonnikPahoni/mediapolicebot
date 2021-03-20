@@ -1,21 +1,34 @@
 # coding=utf-8
 import datetime as dt
-import json, pickle, random
-import telegram, facebook, apiai
+import json
+import os
+import pickle
+import random
+import time
+import warnings
+from telegram.error import NetworkError
+import apiai
+import facebook
+import telegram
+from environs import Env
 from telegram.ext import (
     Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters,
     ConversationHandler,
 )
-import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-with open('configuration.txt') as configuration_file:
-    configuration_text = configuration_file.readlines()[1:10:2]
-FACEBOOK_PAGE_ID = int(configuration_text[0].strip())
-TELEGRAM_CHAT_ID = int(configuration_text[1].strip())
-ADMIN_ID = [int(admin_id) for admin_id in configuration_text[2].strip().split(',')]
-FB_LIKE_ID = int(configuration_text[3].strip())
+env = Env()
+env.read_env()
+
+FACEBOOK_PAGE_ID = int(os.environ['FACEBOOK_PAGE_ID'])
+TELEGRAM_CHAT_ID = int(os.environ['TELEGRAM_CHAT_ID'])
+ADMIN_ID = env.list('ADMIN_ID')
+FB_LIKE_ID = int(os.environ['FB_LIKE_ID'])
+
+TELEGRAM_TOKEN = str(os.environ['TELEGRAM_TOKEN'])
+FACEBOOK_TOKEN = str(os.environ['FACEBOOK_TOKEN'])
+DIALOGFLOW_TOKEN = str(os.environ['DIALOGFLOW_TOKEN'])
 
 with open('bot_messages/help.txt', encoding='utf-8') as help_file:
     help_text = help_file.read()
@@ -25,7 +38,12 @@ with open('bot_messages/nextday.txt', encoding='utf-8') as nextday_file:
     nextday = nextday_file.read().split('\n')
 with open('bot_messages/sameday.txt', encoding='utf-8') as sameday_file:
     sameday = sameday_file.read().split('\n')
+with open('bot_messages/links.txt', encoding='utf-8') as links_file:
+    links_text = links_file.read()
+with open('bot_messages/how.txt', encoding='utf-8') as how_file:
+    how_text = how_file.read()
 
+RECONNECT_INTERVAL = 5
 FACEBOOK_TIME_DIFFERENCE = 3  # Local time ahead of Facebook time
 UTC_TIME_DIFFERENCE = 3  # Local time ahead of UTC time
 SERVER_TIME_DIFFERENCE = UTC_TIME_DIFFERENCE - int(
@@ -57,26 +75,6 @@ def to_html(user):  # making a link out of a user_dict
     return '<a href="tg://user?id=' + str(user['id']) + '">' + user['first_name'] + '</a>'
 
 
-def load_tokens(filename):
-    with open(filename, "r") as tokens_file:
-        tokens = tokens_file.readlines()[1:6:2]
-    return (token.strip('\n') for token in tokens)
-
-
-upd = []
-cont = []
-
-
-def debug(handler):
-    def decorated(update, context):
-        upd.append(update)
-        cont.append(context)
-        print(str(update))
-        return handler(update, context)
-
-    return decorated
-
-
 class PoliceBotData:  # singleton for the bot
     ASSOCIATED_FILENAME = "bot_data/chat_data.txt"
 
@@ -89,7 +87,7 @@ class PoliceBotData:  # singleton for the bot
         except:
             self.post_for_today = False
             self.post_for_tomorrow = False
-            self.last_shared_fb_like = set()
+            self.last_shared_fb_like = []
             self.persistence()
 
     @classmethod
@@ -191,18 +189,17 @@ def selectivity(handler):
     """Talk to specific chats"""
 
     def i_dont_talk_to_you_bastard(update, context):
-        request = apiai.ApiAI(dialogflow_token).text_request()  # Токен API к Dialogflow
+        request = apiai.ApiAI(DIALOGFLOW_TOKEN).text_request()  # Токен API к Dialogflow
         request.lang = 'ru'  # На каком языке будет послан запрос
         request.session_id = 'media_police_bot'  # ID Сессии диалога (нужно, чтобы потом учить бота)
         request.query = update.message.text  # Посылаем запрос к ИИ с сообщением от юзера
-        responseJson = json.loads(request.getresponse().read().decode('utf-8'))
-        message_text = responseJson['result']['fulfillment']['speech']  # Разбираем JSON и вытаскиваем
+        response_json = json.loads(request.getresponse().read().decode('utf-8'))
+        message_text = response_json['result']['fulfillment']['speech']  # Разбираем JSON и вытаскиваем
         if not message_text:
             message_text = 'Обратись к @KonnikPahoni, если тебе что-то от меня нужно.'
         context.bot.send_message(chat_id=update.effective_chat.id,
                                  text=message_text,
                                  reply_to_message_id=update.message.message_id)
-
 
     def decorated(update, context):
         if int(update.message.chat.id) == TELEGRAM_CHAT_ID:
@@ -245,12 +242,12 @@ def echo(update, context):  # sleep counter to make the bot talk less
     global sleep_counter
     if (update.message.reply_to_message.from_user.id == context.bot.id) or (context.bot.username in
                                                                             update.message.text):
-        request = apiai.ApiAI(dialogflow_token).text_request()  # Токен API к Dialogflow
+        request = apiai.ApiAI(DIALOGFLOW_TOKEN).text_request()  # Токен API к Dialogflow
         request.lang = 'ru'
         request.session_id = 'media_police_bot'
         request.query = update.message.text
-        responseJson = json.loads(request.getresponse().read().decode('utf-8'))
-        message_text = responseJson['result']['fulfillment']['speech']
+        response_json = json.loads(request.getresponse().read().decode('utf-8'))
+        message_text = response_json['result']['fulfillment']['speech']
         if not message_text:
             if sleep_counter == 3:
                 context.bot.send_message(chat_id=update.effective_chat.id,
@@ -265,8 +262,20 @@ def echo(update, context):  # sleep counter to make the bot talk less
 
 
 @selectivity
-def help_func(update, context):
+def help_command(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text=help_text, parse_mode='HTML',
+                             disable_web_page_preview=True)
+
+
+@selectivity
+def links_command(update, context):
+    context.bot.send_message(chat_id=update.effective_chat.id, text=links_text, parse_mode='HTML',
+                             disable_web_page_preview=True)
+
+
+@selectivity
+def how_command(update, context):
+    context.bot.send_message(chat_id=update.effective_chat.id, text=how_text, parse_mode='HTML',
                              disable_web_page_preview=True)
 
 
@@ -531,7 +540,14 @@ def get_scheduled_posts(days_from_today, include_all=False):
 @selectivity
 def scheduled_posts(update, context):
     """Show scheduled posts"""
-    scheduled = get_scheduled_posts(360, include_all=True)
+    while True:
+        try:
+            scheduled = get_scheduled_posts(360, include_all=True)
+            break
+        except Exception:
+            print('Could not get scheduled posts. Retrying')
+            time.sleep(RECONNECT_INTERVAL)
+
     if scheduled:
         message_text = 'Поставленные в очередь посты:\n\n'
         for post in scheduled:
@@ -560,7 +576,15 @@ def get_published_posts(get_all=False):
 def published_posts(update, context):
     """Show published posts"""
     message_text = 'Последний пост на странице:\n\n'
-    post = get_published_posts(get_all=True)[0]
+
+    while True:
+        try:
+            post = get_published_posts(get_all=True)[0]
+            break
+        except Exception:
+            print('Could not get published posts. Retrying')
+            time.sleep(RECONNECT_INTERVAL)
+
     link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(post['id']) + '/'
     message_text += '<a href="' + link + '">' + str(post['created_time']) + '</a>:\n\n<i>' + post[
         'message'] + '</i>\n\n'
@@ -570,8 +594,23 @@ def published_posts(update, context):
 
 def sameday_checker(context):
     if not chat_data.post_for_today:
-        scheduled = get_scheduled_posts(0)
-        posted = get_published_posts()
+
+        while True:
+            try:
+                scheduled = get_scheduled_posts(0)
+                break
+            except Exception:
+                print('Could not get scheduled posts. Retrying')
+                time.sleep(RECONNECT_INTERVAL)
+
+        while True:
+            try:
+                posted = get_published_posts()
+                break
+            except Exception:
+                print('Could not get published posts. Retrying')
+                time.sleep(RECONNECT_INTERVAL)
+
         week_day = WEEKDAYS[localize(dt.datetime.today()).weekday()]
         if scheduled:
             message_text = '<b>На сегодня пост стоит!</b>\n\n'
@@ -605,7 +644,15 @@ def sameday_checker(context):
 
 def nextday_checker(context):
     if not chat_data.post_for_tomorrow:
-        scheduled = get_scheduled_posts(1)
+
+        while True:
+            try:
+                scheduled = get_scheduled_posts(1)
+                break
+            except Exception:
+                print('Could not get scheduled posts. Retrying')
+                time.sleep(RECONNECT_INTERVAL)
+
         week_day = WEEKDAYS[(localize(dt.datetime.today()).weekday() + 1) % 7]
         if scheduled:
             message_text = '<b>На завтра пост стоит!</b>\n\n'
@@ -650,16 +697,25 @@ def fb_like_checker(context):
     def send_message(chat_id):
         context.bot.send_message(
             chat_id=chat_id,
-            text='Сябры, атака лайкамі!\n' + message_text,
+            text='Сябры, дапаможам легалайзу лайкамі! Загядзя дзякуй!\n' + message_text,
             parse_mode='HTML',
             disable_web_page_preview=True,
         )
 
-    published = set(post['id'] for post in get_published_posts(get_all=True)[:3])
+    while True:
+        try:
+            _published = get_published_posts(get_all=True)
+            break
+        except Exception:
+            print('Could not get published posts. Retrying')
+            time.sleep(RECONNECT_INTERVAL)
+
+    published = [post['id'] for post in _published][:5]
     message_text = ''
-    for post_id in (published - chat_data.last_shared_fb_like):
-        link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(post_id)
-        message_text += link + '\n'
+
+    if published[0] not in chat_data.last_shared_fb_like:
+        link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(published[0])
+        message_text += link
 
     if message_text != '':
         chat_data.post_for_today = True
@@ -668,10 +724,8 @@ def fb_like_checker(context):
         chat_data.persistence()
 
 
-telegram_token, facebook_token, dialogflow_token = load_tokens('tokens.txt')
-
-updater = Updater(token=telegram_token, use_context=True)
-graph = facebook.GraphAPI(access_token=facebook_token, version="3.1")
+updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
+graph = facebook.GraphAPI(access_token=FACEBOOK_TOKEN, version="3.1")
 
 job_queue = updater.job_queue
 
@@ -728,7 +782,9 @@ optout_handler = ConversationHandler(
                MessageHandler(Filters.all, invalid_answer_buttons(THANK_YOU))],
     conversation_timeout=TIMEOUT_TIME)
 
-dispatcher.add_handler(CommandHandler('help', help_func))
+dispatcher.add_handler(CommandHandler('help', help_command))
+dispatcher.add_handler(CommandHandler('links', links_command))
+dispatcher.add_handler(CommandHandler('how', how_command))
 dispatcher.add_handler(CommandHandler('routine', routine))
 dispatcher.add_handler(CommandHandler('oathed', oathed))
 dispatcher.add_handler(CommandHandler('scheduled', scheduled_posts))
@@ -741,5 +797,12 @@ dispatcher.add_handler(cancel_handler)
 dispatcher.add_handler(MessageHandler(Filters.all, echo))
 
 chat_data = PoliceBotData.load()
-updater.start_polling()
-print('Polling started.')
+
+print('Media Police Bot started')
+
+while True:
+    try:
+        updater.start_polling()
+    except NetworkError as e:
+        print('Network error. Reconnecting in ' + str(RECONNECT_INTERVAL) + ' seconds')
+        time.sleep(RECONNECT_INTERVAL)
