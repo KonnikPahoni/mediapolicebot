@@ -20,3 +20,7 @@ python-telegram-bot==12.4.2
 apiai==1.2.3
 numpy==1.18.1
 environs==9.3.1
+
+### Deployment:
+
+Выполните `./init.sh` для запуска docker-контейнера
