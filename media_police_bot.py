@@ -552,7 +552,7 @@ def scheduled_posts(update, context):
     if scheduled:
         message_text = 'Поставленные в очередь посты:\n\n'
         for post in scheduled:
-            link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(post['id']) + '/'
+            link = 'https://facebook.com/LegalizeBelarus/posts/' + str(post['id']) + '/'
             message_text += '<a href="' + link + '">' + str(post['created_time']) + '</a>:\n\n<i>' + post[
                 'message'] + '</i>\n\n'
     else:
@@ -586,7 +586,7 @@ def published_posts(update, context):
             print('Could not get published posts. Retrying')
             time.sleep(RECONNECT_INTERVAL)
 
-    link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(post['id']) + '/'
+    link = 'https://facebook.com/LegalizeBelarus/posts/' + str(post['id']) + '/'
     message_text += '<a href="' + link + '">' + str(post['created_time']) + '</a>:\n\n<i>' + post[
         'message'] + '</i>\n\n'
     context.bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message_text, parse_mode='HTML',
@@ -618,7 +618,7 @@ def sameday_checker(context):
             chat_data.post_for_today = True
             chat_data.persistence()
             for post in scheduled:
-                link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(post['id']) + '/'
+                link = 'https://facebook.com/LegalizeBelarus/posts/' + str(post['id']) + '/'
                 message_text += '<a href="' + link + '">' + str(post['created_time']) + '</a>:\n\n<i>' + post[
                     'message'] + '</i>\n\n'
             if chat_data.assigned[week_day]:
@@ -628,7 +628,7 @@ def sameday_checker(context):
             chat_data.post_for_today = True
             chat_data.persistence()
             for post in posted:
-                link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(post['id']) + '/'
+                link = 'https://facebook.com/LegalizeBelarus/posts/' + str(post['id']) + '/'
                 message_text += '<a href="' + link + '">' + str(post['created_time']) + '</a>:\n\n<i>' + post[
                     'message'] + '</i>\n\n'
             if chat_data.assigned[week_day]:
@@ -660,7 +660,7 @@ def nextday_checker(context):
             chat_data.post_for_tomorrow = True
             chat_data.persistence()
             for post in scheduled:
-                link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(post['id']) + '/'
+                link = 'https://facebook.com/LegalizeBelarus/posts/' + str(post['id']) + '/'
                 message_text += '<a href="' + link + '">' + str(post['created_time']) + '</a>:\n\n<i>' + post[
                     'message'] + '</i>\n\n'
             if chat_data.assigned[week_day]:
@@ -715,7 +715,7 @@ def fb_like_checker(context):
     message_text = ''
 
     if published[0] not in chat_data.last_shared_fb_like:
-        link = 'https://facebook.com/' + str(FACEBOOK_PAGE_ID) + '/posts/' + str(published[0])
+        link = 'https://facebook.com/LegalizeBelarus/posts/' + str(published[0])
         message_text += link
 
     if message_text != '':
