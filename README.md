@@ -17,7 +17,7 @@ FB_LIKE_ID (группа для *ЛАЙК-АТАК*)
 
 ### Dependencies:
 
-facebook-sdk==3.1.0 python-telegram-bot==12.4.2 apiai==1.2.3 numpy==1.18.1 environs==9.3.1
+facebook-sdk==3.1.0 python-telegram-bot==12.4.2 numpy==1.18.1 environs==9.3.1
 
 ### Deployment:
 

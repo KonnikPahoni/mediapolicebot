@@ -8,7 +8,6 @@ import random
 import time
 import warnings
 from telegram.error import NetworkError
-import apiai
 import facebook
 import telegram
 from environs import Env
