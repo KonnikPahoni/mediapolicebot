@@ -1,6 +1,7 @@
 # coding=utf-8
 import datetime as dt
 import json
+import logging
 import os
 import pickle
 import random
@@ -28,8 +29,6 @@ FB_LIKE_ID = int(os.environ['FB_LIKE_ID'])
 
 TELEGRAM_TOKEN = str(os.environ['TELEGRAM_TOKEN'])
 FACEBOOK_TOKEN = str(os.environ['FACEBOOK_TOKEN'])
-DIALOGFLOW_TOKEN = str(os.environ['DIALOGFLOW_TOKEN'])
-
 
 with open('bot_messages/help.txt', encoding='utf-8') as help_file:
     help_text = help_file.read()
@@ -190,19 +189,14 @@ def selectivity(handler):
     """Talk to specific chats"""
 
     def i_dont_talk_to_you_bastard(update, context):
-        request = apiai.ApiAI(DIALOGFLOW_TOKEN).text_request()  # Токен API к Dialogflow
-        request.lang = 'ru'  # На каком языке будет послан запрос
-        request.session_id = 'media_police_bot'  # ID Сессии диалога (нужно, чтобы потом учить бота)
-        request.query = update.message.text  # Посылаем запрос к ИИ с сообщением от юзера
-        response_json = json.loads(request.getresponse().read().decode('utf-8'))
-        message_text = response_json['result']['fulfillment']['speech']  # Разбираем JSON и вытаскиваем
-        if not message_text:
-            message_text = 'Обратись к @KonnikPahoni, если тебе что-то от меня нужно.'
+        print("New message from " + str(update.effective_chat.id))
+        message_text = 'Обратись к @KonnikPahoni, если тебе что-то от меня нужно.'
         context.bot.send_message(chat_id=update.effective_chat.id,
                                  text=message_text,
                                  reply_to_message_id=update.message.message_id)
 
     def decorated(update, context):
+        print(update.message.chat.id)
         if int(update.message.chat.id) == TELEGRAM_CHAT_ID:
             return handler(update, context)
         elif int(update.message.chat.id) == FB_LIKE_ID:
@@ -243,23 +237,13 @@ def echo(update, context):  # sleep counter to make the bot talk less
     global sleep_counter
     if (update.message.reply_to_message.from_user.id == context.bot.id) or (context.bot.username in
                                                                             update.message.text):
-        request = apiai.ApiAI(DIALOGFLOW_TOKEN).text_request()  # Токен API к Dialogflow
-        request.lang = 'ru'
-        request.session_id = 'media_police_bot'
-        request.query = update.message.text
-        response_json = json.loads(request.getresponse().read().decode('utf-8'))
-        message_text = response_json['result']['fulfillment']['speech']
-        if not message_text:
-            if sleep_counter == 3:
-                context.bot.send_message(chat_id=update.effective_chat.id,
-                                         text='😴 Когда мной не командуют, я сплю. Тебе нужна /help?',
-                                         reply_to_message_id=update.message.message_id)
-                sleep_counter = 0
-            else:
-                sleep_counter += 1
-        else:
+        if sleep_counter == 3:
             context.bot.send_message(chat_id=update.effective_chat.id,
-                                     text=message_text)
+                                     text='😴 Когда мной не командуют, я сплю. Тебе нужна /help?',
+                                     reply_to_message_id=update.message.message_id)
+            sleep_counter = 0
+        else:
+            sleep_counter += 1
 
 
 @selectivity
@@ -707,8 +691,8 @@ def fb_like_checker(context):
         try:
             _published = get_published_posts(get_all=True)
             break
-        except Exception:
-            print('Could not get published posts. Retrying')
+        except Exception as e:
+            print(f'Could not get published posts. {str(e)} Retrying')
             time.sleep(RECONNECT_INTERVAL)
 
     published = [post['id'] for post in _published][:5]
@@ -731,14 +715,11 @@ graph = facebook.GraphAPI(access_token=FACEBOOK_TOKEN, version="3.1")
 job_queue = updater.job_queue
 
 job_queue.run_daily(night_nuller, dt.time(hour=5 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(sameday_checker, dt.time(hour=7 - UTC_TIME_DIFFERENCE, minute=30))
-job_queue.run_daily(nextday_checker, dt.time(hour=9 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(sameday_checker, dt.time(hour=12 - UTC_TIME_DIFFERENCE, minute=00))
-job_queue.run_daily(sameday_checker, dt.time(hour=16 - UTC_TIME_DIFFERENCE, minute=0))
+job_queue.run_daily(sameday_checker, dt.time(hour=17 - UTC_TIME_DIFFERENCE, minute=0))
+job_queue.run_daily(sameday_checker, dt.time(hour=18 - UTC_TIME_DIFFERENCE, minute=0))
 job_queue.run_daily(sameday_checker, dt.time(hour=19 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(nextday_checker, dt.time(hour=20 - UTC_TIME_DIFFERENCE, minute=0))
+job_queue.run_daily(sameday_checker, dt.time(hour=20 - UTC_TIME_DIFFERENCE, minute=0))
 job_queue.run_daily(evening_nuller, dt.time(hour=21 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(nextday_checker, dt.time(hour=23 - UTC_TIME_DIFFERENCE, minute=40))
 job_queue.run_repeating(fb_like_checker, 120, first=1)
 
 dispatcher = updater.dispatcher
@@ -807,5 +788,3 @@ while True:
     except NetworkError as e:
         print('Network error. Reconnecting in ' + str(RECONNECT_INTERVAL) + ' seconds')
         time.sleep(RECONNECT_INTERVAL)
-    except KeyboardInterrupt:
-        print('Media Police Bot stopping')
