@@ -928,11 +928,9 @@ graph = facebook.GraphAPI(access_token=FACEBOOK_TOKEN, version="3.1")
 job_queue = updater.job_queue
 
 job_queue.run_daily(night_nuller, dt.time(hour=5 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(sameday_checker, dt.time(hour=17 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(sameday_checker, dt.time(hour=18 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(sameday_checker, dt.time(hour=19 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(sameday_checker, dt.time(hour=20 - UTC_TIME_DIFFERENCE, minute=0))
-job_queue.run_daily(evening_nuller, dt.time(hour=21 - UTC_TIME_DIFFERENCE, minute=0))
+
+job_queue.run_daily(sameday_checker, dt.time(hour=20 - UTC_TIME_DIFFERENCE, minute=40))
+job_queue.run_daily(evening_nuller, dt.time(hour=24 - UTC_TIME_DIFFERENCE, minute=0))
 job_queue.run_repeating(fb_like_checker, 120, first=1)
 
 dispatcher = updater.dispatcher
